@@ -1,0 +1,25 @@
+# Dependency folders
+chessmind/node_modules/
+
+# Next.js build output
+chessmind/.next/
+chessmind/out/
+chessmind/build/
+
+# Testing
+chessmind/coverage/
+
+# OS/IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Environment files
+chessmind/.env*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
