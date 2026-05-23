@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Square } from "chess.js";
 import { useGameStore } from "@/store/gameStore";
-import { getEngine } from "@/lib/engine";
+import { getPlayEngine, getAnalysisEngine, classifyMove } from "@/lib/engine";
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"];
@@ -25,15 +25,27 @@ export default function Board() {
   const gameMode = useGameStore((s) => s.gameMode);
   const playerColor = useGameStore((s) => s.playerColor);
   const aiLevel = useGameStore((s) => s.aiLevel);
+  const onlineRoomCode = useGameStore((s) => s.onlineRoomCode);
+  const onlinePlayerColor = useGameStore((s) => s.onlinePlayerColor);
 
-  const engineRef = useRef<ReturnType<typeof getEngine> | null>(null);
+  const playEngineRef = useRef<ReturnType<typeof getPlayEngine> | null>(null);
+  const analysisEngineRef = useRef<ReturnType<typeof getAnalysisEngine> | null>(null);
+  const prevEvalRef = useRef<number>(0);
 
-  // Initialize engine
+  // Initialize engines
   useEffect(() => {
-    const engine = getEngine();
-    engineRef.current = engine;
-    engine.init().catch(console.error);
-    return () => { engine.stop(); };
+    const playEngine = getPlayEngine();
+    const analysisEngine = getAnalysisEngine();
+    playEngineRef.current = playEngine;
+    analysisEngineRef.current = analysisEngine;
+    
+    playEngine.init().catch(console.error);
+    analysisEngine.init().catch(console.error);
+    
+    return () => {
+      playEngine.stop();
+      analysisEngine.stop();
+    };
   }, []);
 
   // AI move logic
@@ -43,7 +55,7 @@ export default function Board() {
     const state = useGameStore.getState();
     if (state.game.turn() === playerColor || state.isThinking) return;
 
-    const engine = engineRef.current;
+    const engine = playEngineRef.current;
     if (!engine) return;
 
     state.setIsThinking(true);
@@ -65,29 +77,89 @@ export default function Board() {
       });
   }, [fen, gameMode, playerColor, isGameOver, aiLevel]);
 
-  // Evaluate position
+  // Evaluate position and classify last move
   useEffect(() => {
-    const engine = engineRef.current;
+    const engine = analysisEngineRef.current;
     if (!engine) return;
 
     const state = useGameStore.getState();
+    const currentHistoryLength = state.moveHistory.length;
+
     engine
       .evaluate(state.fen, 16)
       .then((result) => {
-        const evalFromWhite =
-          state.game.turn() === "w" ? result.eval : -result.eval;
+        const turn = state.game.turn();
+        const evalFromWhite = turn === "w" ? result.eval : -result.eval;
+
+        // Update current evaluation
         useGameStore.getState().setCurrentEval(evalFromWhite);
+
+        if (currentHistoryLength > 0) {
+          const prevEval = prevEvalRef.current;
+          const newEval = evalFromWhite;
+
+          // The player who just moved is the opposite of the current turn
+          const justMoved = turn === "w" ? "b" : "w";
+
+          // Calculate centipawn loss (positive is worse for the player who just moved)
+          let cpl = 0;
+          if (justMoved === "w") {
+            cpl = prevEval - newEval;
+          } else {
+            cpl = newEval - prevEval;
+          }
+
+          // Classify the move
+          const classification = classifyMove(cpl);
+
+          // Add it to the store
+          useGameStore.getState().addClassification(currentHistoryLength - 1, classification, evalFromWhite);
+
+          // Trigger AI Coach explanation ONLY for the human player's moves
+          if (justMoved === playerColor) {
+            if (classification === "mistake" || classification === "blunder") {
+              const moveSan = state.moveHistory[currentHistoryLength - 1]?.move?.san || "";
+              useGameStore.getState().generateCoachExplanation(state.fen, moveSan, classification, evalFromWhite).catch(console.error);
+            } else {
+              // Reset explanation for standard moves to keep them on-demand
+              useGameStore.getState().setCoachExplanation(null);
+            }
+          }
+        }
+
+        // Save current eval for next move comparison
+        prevEvalRef.current = evalFromWhite;
       })
       .catch(console.error);
   }, [fen]);
 
   // Start clock after first move
   useEffect(() => {
-    const { moveHistory, timeControl } = useGameStore.getState();
-    if (moveHistory.length === 1 && timeControl.time > 0) {
+    const { moveHistory, timeControl, gameMode } = useGameStore.getState();
+    if (gameMode !== "online" && moveHistory.length === 1 && timeControl.time > 0) {
       useGameStore.getState().setClockRunning(true);
     }
   }, [fen]);
+
+  // Online Multiplayer Polling Loop
+  useEffect(() => {
+    if (gameMode !== "online" || !onlineRoomCode || isGameOver) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/rooms/${onlineRoomCode}`);
+        if (res.ok) {
+          const serverState = await res.json();
+          // Synchronize locally with server board state
+          useGameStore.getState().syncOnlineState(serverState);
+        }
+      } catch (err) {
+        console.error("Board online poll error:", err);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [fen, gameMode, onlineRoomCode, isGameOver]);
 
   // Parse FEN to get board state
   const board = parseFen(fen);
@@ -100,6 +172,7 @@ export default function Board() {
     const state = useGameStore.getState();
     if (state.isGameOver) return;
     if (state.gameMode === "ai" && state.game.turn() !== state.playerColor) return;
+    if (state.gameMode === "online" && state.game.turn() !== state.onlinePlayerColor) return;
 
     state.selectSquare(square);
   }
@@ -132,6 +205,7 @@ export default function Board() {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(8, 1fr)",
+          gridTemplateRows: "repeat(8, 1fr)",
           aspectRatio: "1",
           width: "100%",
           borderRadius: "12px",
@@ -224,26 +298,26 @@ export default function Board() {
           position: relative;
           transition: background 0.15s;
         }
-        .board-square.light { background: #8b82a0; }
-        .board-square.dark { background: #4a4458; }
-        .board-square.selected { background: rgba(124, 92, 252, 0.55) !important; }
-        .board-square.last-move { background: rgba(124, 92, 252, 0.25) !important; }
+        .board-square.light { background: #eeeed2; }
+        .board-square.dark { background: #769656; }
+        .board-square.selected { background: rgba(186, 201, 74, 0.6) !important; }
+        .board-square.last-move { background: rgba(247, 247, 133, 0.4) !important; }
         .board-square:hover { filter: brightness(1.1); }
 
         .legal-dot {
           position: absolute;
-          width: 28%;
-          height: 28%;
+          width: 26%;
+          height: 26%;
           border-radius: 50%;
-          background: rgba(124, 92, 252, 0.45);
+          background: rgba(0, 0, 0, 0.15);
           pointer-events: none;
         }
 
         .capture-ring {
           position: absolute;
-          inset: 4%;
+          inset: 0;
           border-radius: 50%;
-          border: 4px solid rgba(124, 92, 252, 0.5);
+          border: 5px solid rgba(0, 0, 0, 0.12);
           pointer-events: none;
         }
 
@@ -266,8 +340,8 @@ export default function Board() {
         }
         .rank-label { top: 2px; left: 4px; }
         .file-label { bottom: 2px; right: 4px; }
-        .light .coord-label { color: #4a4458; }
-        .dark .coord-label { color: #8b82a0; }
+        .light .coord-label { color: #769656; }
+        .dark .coord-label { color: #eeeed2; }
       `}</style>
     </div>
   );

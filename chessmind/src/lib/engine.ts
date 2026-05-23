@@ -10,41 +10,91 @@ export class StockfishEngine {
   private worker: Worker | null = null;
   private messageHandlers: MessageHandler[] = [];
   private ready = false;
-  private readyResolve: (() => void) | null = null;
+  private initPromise: Promise<void> | null = null;
 
   async init(): Promise<void> {
-    if (this.worker) return;
+    if (this.ready) return;
+    if (this.initPromise) return this.initPromise;
 
-    return new Promise((resolve, reject) => {
-      try {
-        // Use the stockfish.js WASM worker
-        this.worker = new Worker("/stockfish/stockfish-18-lite-single.js");
+    this.initPromise = new Promise((resolve, reject) => {
+      let initialized = false;
 
+      const setupWorker = (workerInstance: Worker) => {
+        this.worker = workerInstance;
+        
         this.worker.onmessage = (e) => {
           const data = typeof e.data === "string" ? e.data : String(e.data);
           this.messageHandlers.forEach((handler) => handler(data));
 
           if (data === "readyok") {
             this.ready = true;
-            if (this.readyResolve) {
-              this.readyResolve();
-              this.readyResolve = null;
-            }
+            initialized = true;
+            resolve();
           }
         };
 
         this.worker.onerror = (err) => {
-          console.error("Stockfish worker error:", err);
-          reject(err);
+          console.error("Stockfish worker error details:", {
+            message: err.message,
+            filename: err.filename,
+            lineno: err.lineno,
+            colno: err.colno,
+            error: err.error
+          });
+          if (!initialized) {
+            tryFallback();
+          }
         };
 
         this.sendCommand("uci");
-        this.readyResolve = resolve;
         this.sendCommand("isready");
-      } catch (err) {
-        reject(err);
-      }
+      };
+
+      const tryPrimary = () => {
+        try {
+          console.log("[Engine] Attempting primary Stockfish WASM Web Worker...");
+          
+          // Use window.Worker dynamically to prevent Next.js static analysis bundler interception
+          const WorkerConstructor = typeof window !== "undefined" ? window.Worker : null;
+          if (!WorkerConstructor) throw new Error("Window.Worker is not available");
+          
+          const worker = new WorkerConstructor("/stockfish/stockfish-18-lite-single.js");
+          setupWorker(worker);
+        } catch (err) {
+          console.warn("[Engine] Primary WASM Web Worker initialization failed, trying fallback...", err);
+          tryFallback();
+        }
+      };
+
+      const tryFallback = () => {
+        try {
+          console.log("[Engine] Attempting ASM.js Web Worker fallback...");
+          
+          const WorkerConstructor = typeof window !== "undefined" ? window.Worker : null;
+          if (!WorkerConstructor) throw new Error("Window.Worker is not available");
+          
+          const worker = new WorkerConstructor("/stockfish/worker.js");
+          setupWorker(worker);
+        } catch (asmErr) {
+          console.error("[Engine] All Stockfish initialization strategies failed!", asmErr);
+          this.initPromise = null;
+          reject(asmErr);
+        }
+      };
+
+      // Start flow
+      tryPrimary();
+
+      // Final fallback safety timeout
+      setTimeout(() => {
+        if (!this.ready) {
+          console.warn("[Engine] Stockfish engine initialization timed out, resolving to allow interface interactions.");
+          resolve();
+        }
+      }, 15000);
     });
+
+    return this.initPromise;
   }
 
   private sendCommand(command: string): void {
@@ -58,9 +108,12 @@ export class StockfishEngine {
     };
   }
 
+  clearHandlers(): void {
+    this.messageHandlers = [];
+  }
+
   /**
    * Set engine skill level (0-20).
-   * Maps roughly to ELO 800-3200.
    */
   setSkillLevel(level: number): void {
     const clamped = Math.max(0, Math.min(20, level));
@@ -75,6 +128,8 @@ export class StockfishEngine {
     depth: number = 18,
     multiPV: number = 1
   ): Promise<EvalResult> {
+    this.restartWorker();
+
     if (!this.ready) await this.init();
 
     return new Promise((resolve) => {
@@ -90,7 +145,6 @@ export class StockfishEngine {
       this.sendCommand(`position fen ${fen}`);
 
       const cleanup = this.onMessage((data) => {
-        // Parse "info" lines for evaluation data
         if (data.startsWith("info depth")) {
           const parsedInfo = parseInfoLine(data);
           if (parsedInfo) {
@@ -104,7 +158,6 @@ export class StockfishEngine {
               depth: parsedInfo.depth,
               mate: parsedInfo.mate,
             };
-            // Primary line
             if (pvIndex === 0) {
               result.eval = parsedInfo.score;
               result.depth = parsedInfo.depth;
@@ -113,7 +166,6 @@ export class StockfishEngine {
           }
         }
 
-        // Parse "bestmove" line — analysis complete
         if (data.startsWith("bestmove")) {
           const parts = data.split(" ");
           result.bestMove = parts[1] || "";
@@ -135,6 +187,9 @@ export class StockfishEngine {
     timeMs: number = 1000
   ): Promise<string> {
     if (!this.ready) await this.init();
+
+    this.stop();
+    this.clearHandlers();
 
     this.setSkillLevel(skillLevel);
 
@@ -168,14 +223,27 @@ export class StockfishEngine {
     this.worker?.terminate();
     this.worker = null;
     this.ready = false;
+    this.initPromise = null;
+  }
+
+  restartWorker(): void {
+    try {
+      this.worker?.terminate();
+    } catch (e) {
+      console.warn("Error terminating worker:", e);
+    }
+    this.worker = null;
+    this.ready = false;
+    this.initPromise = null;
+    this.messageHandlers = [];
   }
 }
 
 // ─── Types ───
 
 export interface EvalResult {
-  eval: number; // centipawns from side-to-move perspective
-  bestMove: string; // UCI format e.g. "e2e4"
+  eval: number;
+  bestMove: string;
   depth: number;
   mate: number | null;
   lines: EvalLine[];
@@ -206,7 +274,6 @@ function parseInfoLine(line: string): ParsedInfo | null {
   const multipvMatch = line.match(/multipv (\d+)/);
 
   if (!depthMatch) return null;
-  // Skip low seldepth info lines
   const seldepthMatch = line.match(/seldepth (\d+)/);
   if (seldepthMatch && parseInt(seldepthMatch[1]) < 3) return null;
 
@@ -235,12 +302,20 @@ export function classifyMove(
   return "blunder";
 }
 
-// Singleton instance
-let engineInstance: StockfishEngine | null = null;
+// Singleton instances
+let analysisEngineInstance: StockfishEngine | null = null;
+let playEngineInstance: StockfishEngine | null = null;
 
-export function getEngine(): StockfishEngine {
-  if (!engineInstance) {
-    engineInstance = new StockfishEngine();
+export function getAnalysisEngine(): StockfishEngine {
+  if (!analysisEngineInstance) {
+    analysisEngineInstance = new StockfishEngine();
   }
-  return engineInstance;
+  return analysisEngineInstance;
+}
+
+export function getPlayEngine(): StockfishEngine {
+  if (!playEngineInstance) {
+    playEngineInstance = new StockfishEngine();
+  }
+  return playEngineInstance;
 }
