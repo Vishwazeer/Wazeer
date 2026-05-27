@@ -70,6 +70,15 @@ export class StockfishEngine {
         try {
           console.log("[Engine] Attempting ASM.js Web Worker fallback...");
           
+          if (this.worker) {
+            try {
+              this.worker.terminate();
+            } catch (e) {
+              console.warn("Failed to terminate primary worker on fallback:", e);
+            }
+            this.worker = null;
+          }
+          
           const WorkerConstructor = typeof window !== "undefined" ? window.Worker : null;
           if (!WorkerConstructor) throw new Error("Window.Worker is not available");
           
