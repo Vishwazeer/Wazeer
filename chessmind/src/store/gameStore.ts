@@ -546,7 +546,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         onlineRoomCode: data.code,
         onlinePlayerColor: data.playerColor,
         onlineOpponentJoined: false,
-        showSetup: false,
+        showSetup: true,
         clockRunning: false,
         whiteTime: timeControl.time,
         blackTime: timeControl.time,
