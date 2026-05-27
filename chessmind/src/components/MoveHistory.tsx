@@ -33,8 +33,13 @@ function MoveEntry({
 
   if (!isInteractive) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs text-[var(--color-text-dim)]/60">
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs text-[var(--color-text-dim)]/60" title={classification ?? undefined}>
         <span>{move.san}</span>
+        {classInfo && (
+          <span className="text-[10px] font-bold" style={{ color: classInfo.color }}>
+            {classInfo.icon}
+          </span>
+        )}
       </span>
     );
   }

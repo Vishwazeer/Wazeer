@@ -154,8 +154,13 @@ export default function GameHistory() {
                           )}
                         </button>
                       ) : (
-                        <span className="px-1.5 py-0.5 text-xs text-[var(--color-text-dim)]/60">
-                          {pair.white.san}
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs text-[var(--color-text-dim)]/60" title={pair.white.classification ?? undefined}>
+                          <span>{pair.white.san}</span>
+                          {pair.white.classification && classificationIcons[pair.white.classification] && (
+                            <span className="text-[10px] font-bold" style={{ color: classificationIcons[pair.white.classification].color }}>
+                              {classificationIcons[pair.white.classification].icon}
+                            </span>
+                          )}
                         </span>
                       )}
 
@@ -179,8 +184,13 @@ export default function GameHistory() {
                             )}
                           </button>
                         ) : (
-                          <span className="px-1.5 py-0.5 text-xs text-[var(--color-text-dim)]/60">
-                            {pair.black.san}
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs text-[var(--color-text-dim)]/60" title={pair.black.classification ?? undefined}>
+                            <span>{pair.black.san}</span>
+                            {pair.black.classification && classificationIcons[pair.black.classification] && (
+                              <span className="text-[10px] font-bold" style={{ color: classificationIcons[pair.black.classification].color }}>
+                                {classificationIcons[pair.black.classification].icon}
+                              </span>
+                            )}
                           </span>
                         )
                       )}

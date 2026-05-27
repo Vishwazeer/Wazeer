@@ -27,6 +27,7 @@ export default function Board() {
   const aiLevel = useGameStore((s) => s.aiLevel);
   const onlineRoomCode = useGameStore((s) => s.onlineRoomCode);
   const onlinePlayerColor = useGameStore((s) => s.onlinePlayerColor);
+  const activeHint = useGameStore((s) => s.activeHint);
 
   const playEngineRef = useRef<ReturnType<typeof getPlayEngine> | null>(null);
   const analysisEngineRef = useRef<ReturnType<typeof getAnalysisEngine> | null>(null);
@@ -185,6 +186,8 @@ export default function Board() {
     const isLegal = legalMoves.includes(square);
     const isLastMoveFrom = lastMove?.from === square;
     const isLastMoveTo = lastMove?.to === square;
+    const isHintFrom = activeHint?.from === square;
+    const isHintTo = activeHint?.to === square;
 
     const state = useGameStore.getState();
     const piece = state.game.get(square);
@@ -193,6 +196,7 @@ export default function Board() {
     let classes = `board-square ${isLight ? "light" : "dark"}`;
     if (isSelected) classes += " selected";
     if (isLastMoveFrom || isLastMoveTo) classes += " last-move";
+    if (isHintFrom || isHintTo) classes += " hint";
     if (isLegal && !isLegalCapture) classes += " legal-move";
     if (isLegalCapture) classes += " legal-capture";
 
@@ -303,6 +307,10 @@ export default function Board() {
         .board-square.dark { background: #769656; }
         .board-square.selected { background: rgba(186, 201, 74, 0.6) !important; }
         .board-square.last-move { background: rgba(247, 247, 133, 0.4) !important; }
+        .board-square.hint { 
+          background-color: rgba(6, 182, 212, 0.5) !important; 
+          box-shadow: inset 0 0 12px rgba(6, 182, 212, 0.8) !important;
+        }
         .board-square:hover { filter: brightness(1.1); }
 
         .legal-dot {

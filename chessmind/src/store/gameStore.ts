@@ -129,6 +129,12 @@ interface GameState {
   resumeSavedGame: () => boolean;
   deleteSavedGame: () => void;
   checkSavedGame: () => void;
+
+  // Hints System
+  hintsRemaining: number;
+  activeHint: { from: Square; to: Square } | null;
+  requestHint: () => Promise<void>;
+  clearHint: () => void;
 }
 
 
@@ -173,6 +179,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   gameHistory: [],
   selectedHistoryGame: null,
   hasSavedGame: false,
+  hintsRemaining: 3,
+  activeHint: null,
 
   makeMove: (from, to, promotion) => {
     const { game, timeControl, moveHistory } = get();
@@ -222,6 +230,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         result,
         clockRunning: !isOver && timeControl.time > 0,
         activeExplanationMoveIndex: null, // Reset active explanation index on new move
+        activeHint: null,
       });
 
       // Add increment to the player who just moved
@@ -252,6 +261,30 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
+    // If clicking the same selected square, deselect it
+    if (square === selectedSquare) {
+      set({ selectedSquare: null, legalMoves: [] });
+      return;
+    }
+
+    // If clicking another friendly piece, switch selection directly
+    const clickedPiece = game.get(square);
+    const turn = game.turn();
+    const myColor = gameMode === "online" ? get().onlinePlayerColor : turn;
+    
+    // In online mode, we can only select our own color. In local/AI modes, we select the active turn's color.
+    const targetColor = gameMode === "online" ? myColor : turn;
+
+    if (clickedPiece && clickedPiece.color === targetColor) {
+      const moves = game.moves({ square, verbose: true });
+      set({
+        selectedSquare: square,
+        legalMoves: moves.map((m) => m.to),
+        activeHint: null, // Clear active hint highlight on manual selection
+      });
+      return;
+    }
+
     // If there's already a selected square, try to make a move
     if (selectedSquare) {
       if (gameMode === "online") {
@@ -263,17 +296,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
-    // Select the new square if it has a piece of the current player
-    const piece = game.get(square);
-    if (piece && piece.color === game.turn()) {
-      const moves = game.moves({ square, verbose: true });
-      set({
-        selectedSquare: square,
-        legalMoves: moves.map((m) => m.to),
-      });
-    } else {
-      set({ selectedSquare: null, legalMoves: [] });
-    }
+    // Fallback deselect
+    set({ selectedSquare: null, legalMoves: [] });
   },
 
   setAiLevel: (level) => set({ aiLevel: level }),
@@ -303,6 +327,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       isThinking: false,
       currentEval: 0,
       boardFlipped: playerColor === "b",
+      hintsRemaining: 3,
+      activeHint: null,
     });
   },
 
@@ -321,6 +347,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMove: null,
       isThinking: false,
       currentEval: 0,
+      hintsRemaining: 3,
+      activeHint: null,
     });
   },
 
@@ -608,13 +636,16 @@ export const useGameStore = create<GameState>((set, get) => ({
         const m = moves[i];
         const resultMove = freshGame.move({ from: m.from, to: m.to, promotion: m.promotion || "q" });
         if (resultMove) {
+          const existing = moveHistory[i];
+          const hasSameSan = existing && existing.move.san === resultMove.san;
+
           newHistory.push({
             move: resultMove,
-            classification: null,
-            eval: undefined,
+            classification: hasSameSan ? existing.classification : null,
+            eval: hasSameSan ? existing.eval : undefined,
             fen: freshGame.fen(),
-            coachExplanation: null,
-            coachSummary: null,
+            coachExplanation: hasSameSan ? existing.coachExplanation : null,
+            coachSummary: hasSameSan ? existing.coachSummary : null,
           });
         }
       }
@@ -836,4 +867,39 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ hasSavedGame: exists });
     }
   },
+
+  requestHint: async () => {
+    const { hintsRemaining, isGameOver, gameMode, playerColor, game, isThinking, fen, aiLevel } = get();
+    if (hintsRemaining <= 0 || isGameOver || isThinking) return;
+
+    // In AI/Online mode, it must be the user's turn
+    const turn = game.turn();
+    const myColor = gameMode === "online" ? get().onlinePlayerColor : playerColor;
+    if (gameMode !== "local" && turn !== myColor) return;
+
+    set({ isThinking: true });
+
+    try {
+      const { getPlayEngine } = await import("@/lib/engine");
+      const engine = getPlayEngine();
+      
+      // Calculate best move using Stockfish
+      const bestMoveStr = await engine.getBestMove(fen, aiLevel, 1000);
+      if (bestMoveStr && bestMoveStr.length >= 4) {
+        const from = bestMoveStr.substring(0, 2) as Square;
+        const to = bestMoveStr.substring(2, 4) as Square;
+        
+        set((s) => ({
+          hintsRemaining: s.hintsRemaining - 1,
+          activeHint: { from, to },
+        }));
+      }
+    } catch (err) {
+      console.error("[Hint] Failed to calculate hint:", err);
+    } finally {
+      set({ isThinking: false });
+    }
+  },
+
+  clearHint: () => set({ activeHint: null }),
 }));

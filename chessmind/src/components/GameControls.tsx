@@ -11,6 +11,16 @@ export default function GameControls() {
   const moveHistory = useGameStore((s) => s.moveHistory);
   const gameMode = useGameStore((s) => s.gameMode);
   const saveCurrentGame = useGameStore((s) => s.saveCurrentGame);
+  const hintsRemaining = useGameStore((s) => s.hintsRemaining);
+  const isThinking = useGameStore((s) => s.isThinking);
+  const requestHint = useGameStore((s) => s.requestHint);
+  const game = useGameStore((s) => s.game);
+  const playerColor = useGameStore((s) => s.playerColor);
+  const onlinePlayerColor = useGameStore((s) => s.onlinePlayerColor);
+
+  const turn = game.turn();
+  const myColor = gameMode === "online" ? onlinePlayerColor : playerColor;
+  const isMyTurn = gameMode === "local" || turn === myColor;
 
   return (
     <div className="flex flex-col gap-3">
@@ -73,6 +83,20 @@ export default function GameControls() {
           </button>
         )}
       </div>
+
+      {!isGameOver && (
+        <button
+          onClick={() => requestHint()}
+          disabled={hintsRemaining <= 0 || isThinking || !isMyTurn}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 
+                     bg-[var(--color-cyan)]/15 border border-[var(--color-cyan)]/30 
+                     rounded-xl text-sm font-bold text-[var(--color-cyan)]
+                     hover:bg-[var(--color-cyan)]/25 hover:border-[var(--color-cyan)]/45
+                     active:scale-[0.98] transition-all shadow-md disabled:opacity-45 disabled:cursor-not-allowed"
+        >
+          {isThinking ? "🔍 Thinking Hint..." : `💡 Ask Hint (${hintsRemaining}/3 Remaining)`}
+        </button>
+      )}
 
       {!isGameOver && gameMode !== "online" && (
         <button
