@@ -32,6 +32,7 @@ export default function AICoach() {
   const coachLoading = useGameStore((s) => s.coachLoading);
   const generateCoachExplanationForIndex = useGameStore((s) => s.generateCoachExplanationForIndex);
   const playerColor = useGameStore((s) => s.playerColor);
+  const gameMode = useGameStore((s) => s.gameMode);
 
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -51,6 +52,9 @@ export default function AICoach() {
 
   // Find the latest move played by the human player
   const getLatestHumanMoveIndex = () => {
+    if (gameMode === "local") {
+      return moveHistory.length - 1;
+    }
     for (let i = moveHistory.length - 1; i >= 0; i--) {
       const isWhite = i % 2 === 0;
       const moveColor = isWhite ? "w" : "b";
@@ -274,24 +278,34 @@ export default function AICoach() {
                             &ldquo;{targetMove.coachSummary || "Makes a solid developmental play."}&rdquo;
                           </p>
                         ) : (
-                          bullets.length > 0 ? (
-                            <ul className="space-y-1.5">
-                              {bullets.map((bullet, idx) => (
-                                <li key={idx} className="flex items-start gap-2 text-xs text-[var(--color-text)]">
-                                  <span className="text-xs shrink-0 select-none leading-none mt-0.5" style={{ color: coach.color }}>
-                                    •
-                                  </span>
-                                  <span className="leading-tight font-medium">
-                                    {bullet}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-xs text-[var(--color-text)] leading-relaxed italic">
-                              &ldquo;{explanation}&rdquo;
-                            </p>
-                          )
+                          (() => {
+                            const lines = explanation.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+                            const hasBullets = lines.some(l => l.startsWith("•") || l.startsWith("-") || l.startsWith("*")) || lines.length > 1;
+
+                            if (hasBullets) {
+                              const bulletsList = lines.map(l => l.replace(/^[•\-\*\s]+/, ""));
+                              return (
+                                <ul className="space-y-1.5">
+                                  {bulletsList.map((bullet, idx) => (
+                                    <li key={idx} className="flex items-start gap-2 text-xs text-[var(--color-text)]">
+                                      <span className="text-xs shrink-0 select-none leading-none mt-0.5" style={{ color: coach.color }}>
+                                        •
+                                      </span>
+                                      <span className="leading-tight font-medium">
+                                        {bullet}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              );
+                            } else {
+                              return (
+                                <p className="text-xs text-[var(--color-text)] leading-relaxed font-medium">
+                                  {explanation}
+                                </p>
+                              );
+                            }
+                          })()
                         )}
 
                         {/* Toggle Wording Button */}

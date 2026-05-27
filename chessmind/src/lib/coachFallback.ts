@@ -5,65 +5,64 @@ export function getFallbackExplanation(
   classification: MoveClassification,
   _evalScore: number
 ): string {
-  // Simple, beginner-friendly descriptors (no chess jargon)
-  let themeBullets = "";
+  // Friendly, child-friendly strategic explanations (no chess jargon)
+  let themeDescription = "";
   
   if (moveSan.startsWith("O-O")) {
-    themeBullets = "• Keeps King safe\n• Activates the Rook";
+    themeDescription = "Wow, you just tucked your King away into a safe little castle, and activated your Rook to join the game! Keeping your King safe early on is one of the best secrets to winning in chess.";
   } else if (moveSan.includes("+")) {
-    themeBullets = "• Checks the opponent King\n• Forces a response";
+    themeDescription = "Great check! You put the opponent's King under fire, forcing them to stop whatever they were planning and defend their King. This gives you a great chance to take control of the board!";
   } else if (moveSan.includes("x")) {
     const pieceCode = moveSan[0];
-    let captured = "a piece";
-    if (pieceCode === "N") captured = "a Knight";
-    else if (pieceCode === "B") captured = "a Bishop";
-    else if (pieceCode === "R") captured = "a Rook";
-    else if (pieceCode === "Q") captured = "the Queen";
-    else if (pieceCode === "K") captured = "a piece with King";
+    let capturedName = "a piece";
+    if (pieceCode === "N") capturedName = "a Knight";
+    else if (pieceCode === "B") capturedName = "a Bishop";
+    else if (pieceCode === "R") capturedName = "a Rook";
+    else if (pieceCode === "Q") capturedName = "the Queen";
     
-    themeBullets = `• Captures ${captured}\n• Wins material`;
+    themeDescription = `Yum! You captured ${capturedName} and won some material. Remember, every piece you capture weakens the opponent's army and makes your own team stronger!`;
   } else if (moveSan.startsWith("N")) {
-    themeBullets = "• Moves Knight forward\n• Controls center squares";
+    themeDescription = "Your Knight hops forward into the battle! Knights love to control the middle of the board and can jump over other pieces to surprise your opponent.";
   } else if (moveSan.startsWith("B")) {
-    themeBullets = "• Activates Bishop\n• Controls long diagonal path";
+    themeDescription = "Your Bishop shoots down a long, open diagonal! Bishops are like long-range archers in chess, attacking from far away to pressure the opponent's pieces.";
   } else if (moveSan.startsWith("R")) {
-    themeBullets = "• Moves Rook to open line\n• Controls the lane";
+    themeDescription = "Beep beep! Your Rook takes over an open lane. Rooks love wide open lines where they can speed up and down to attack the opponent's back line.";
   } else if (moveSan.startsWith("Q")) {
-    themeBullets = "• Activates powerful Queen\n• Attacks multiple targets";
+    themeDescription = "The powerful Queen steps into the action! She is the strongest player on your team, so be careful to keep her guarded while she launches her attack.";
   } else if (moveSan.startsWith("K")) {
-    themeBullets = "• Safely shifts King\n• Escapes danger";
+    themeDescription = "Your King takes a careful step to escape danger. In chess, keeping your King safe is always your number one priority!";
   } else if (/^[a-h][1-8]/.test(moveSan) || /^[a-h]x/.test(moveSan)) {
     if (moveSan.startsWith("e4") || moveSan.startsWith("d4") || moveSan.startsWith("c4") || moveSan.startsWith("e5") || moveSan.startsWith("d5")) {
-      themeBullets = "• Pushes center Pawn\n• Opens up space for pieces";
+      themeDescription = "Excellent center push! Controlling the middle of the board is like owning the playground—it gives your pieces more room to play and restricts the opponent.";
     } else {
-      themeBullets = "• Moves Pawn to defend\n• Solidifies position";
+      themeDescription = "Nice pawn play! You are moving your pawns forward to build a strong wall that the opponent's pieces cannot break through.";
     }
   } else {
-    themeBullets = "• Standard developmental move\n• Safe play";
+    themeDescription = "A solid, standard move! You are slowly developing your pieces and getting ready to launch a big attack. Good, steady play!";
   }
 
-  // Combine classification title with beginner-friendly bullets
+  // Combine classification title with teacher-style paragraphs
   switch (classification) {
     case "brilliant":
-      return `✦ AMAZING MOVE\n${themeBullets}\n• Sets up a huge win`;
+      return `${themeDescription} This was a brilliant, amazing move that sets up a huge winning opportunity for your team!`;
     
     case "great":
-      return `✓ EXCELLENT CHOICE\n${themeBullets}\n• Improves your position`;
+      return `${themeDescription} This was an excellent choice that improves your position and puts pressure on your opponent!`;
     
     case "good":
-      return `✓ GOOD MOVE\n${themeBullets}\n• Solid play`;
+      return `${themeDescription} This is a good, solid move that keeps your play steady and coordinates your pieces nicely.`;
     
     case "inaccuracy":
-      return `?! SLIGHTLY WEAK MOVE\n${themeBullets}\n• Gives up a little control`;
+      return `${themeDescription} Hmm, this move is okay, but it is slightly weak and gives up a little bit of your control on the board.`;
     
     case "mistake":
-      return `? MISTAKE\n${themeBullets}\n• Leaves an opening\n• Watch out for counterattacks`;
+      return `${themeDescription} Oh! This move leaves an opening or leaves a piece unsafe. Try to scan the board first and ensure your pieces are guarding each other like a team!`;
     
     case "blunder":
-      return `?? CRITICAL BLUNDER\n${themeBullets}\n• Hangs a free piece\n• Unsafe position`;
+      return `${themeDescription} Oops! You accidentally left a piece hanging or walked into a trap. Don't worry, even grandmasters make mistakes! Just take a deep breath and keep your eyes peeled for threats.`;
     
     default:
-      return `♟ NORMAL MOVE\n${themeBullets}`;
+      return `${themeDescription} Steady, standard play!`;
   }
 }
 
@@ -75,7 +74,7 @@ export function getFallbackSummary(
     return "Protects your king and gets your rook ready.";
   }
   if (moveSan.includes("+")) {
-    return "Attacks the opponent king to force a defensive move.";
+    return "Attacks the opponent king to force a response.";
   }
   if (moveSan.includes("x")) {
     return "Takes an opponent piece to win material.";

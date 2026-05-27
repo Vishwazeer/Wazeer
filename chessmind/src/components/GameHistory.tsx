@@ -126,8 +126,8 @@ export default function GameHistory() {
             ) : (
               <div className="grid grid-cols-1 gap-1 font-mono text-sm max-h-[160px] overflow-y-auto p-1.5 bg-black/20 rounded-xl border border-[var(--color-border)]">
                 {movePairs.map((pair) => {
-                  const isWhiteHuman = selectedGame.playerColor === "w";
-                  const isBlackHuman = selectedGame.playerColor === "b";
+                  const isWhiteHuman = selectedGame.playerColor === "w" || selectedGame.gameMode === "local";
+                  const isBlackHuman = selectedGame.playerColor === "b" || selectedGame.gameMode === "local";
 
                   return (
                     <div key={pair.number} className="flex items-center gap-2 py-0.5">

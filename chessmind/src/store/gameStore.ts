@@ -122,6 +122,13 @@ interface GameState {
   saveGameToHistory: () => void;
   setSelectedHistoryGame: (game: any | null) => void;
   clearGameHistory: () => void;
+
+  // Save/Resume Game State
+  hasSavedGame: boolean;
+  saveCurrentGame: () => void;
+  resumeSavedGame: () => boolean;
+  deleteSavedGame: () => void;
+  checkSavedGame: () => void;
 }
 
 
@@ -165,6 +172,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   // Game History state
   gameHistory: [],
   selectedHistoryGame: null,
+  hasSavedGame: false,
 
   makeMove: (from, to, promotion) => {
     const { game, timeControl, moveHistory } = get();
@@ -436,23 +444,22 @@ export const useGameStore = create<GameState>((set, get) => ({
                 {
                   parts: [
                     {
-                      text: `You are a master chess coach. Analyze this position and move.
+                      text: `You are a warm and friendly chess schoolteacher explaining chess moves to a child. Analyze this position and move.
                       Board FEN: ${fen}
                       Move played: ${moveSan}
                       Move classification: ${classification || "Normal move"}
                       Position evaluation (centipawns from white's perspective): ${evalScore}
                       
-                      Provide exactly 2 to 3 extremely simple, beginner-friendly, and short bullet points (max 5 words per bullet point) explaining what this move does in plain English.
+                      Provide a single warm, encouraging, and highly educational paragraph (exactly 2 to 3 sentences) explaining the strategic purpose and fun lesson behind this move in plain English. Speak like a teacher talking to a young student.
                       
-                      After the bullet points, add a separator line "===" and then write a single, extremely brief and simple summary sentence (max 12 words) explaining the move's main idea for absolute beginners.
+                      After the paragraph, add a separator line "===" and then write a single, extremely brief and simple summary sentence (max 12 words) for beginners.
                       
                       E.g.
-                      • Castles King safely
-                      • Controls center space
+                      Wow, you just tucked your King away into a safe little castle, and activated your Rook to join the game! Keeping your King safe early on is one of the best secrets to winning chess.
                       ===
                       Protects your king and gets your rook ready to play.
                       
-                      Use very basic words that any beginner can easily understand. Absolutely AVOID advanced chess jargon (e.g. 'tempo', 'tension', 'counterplay', 'structural concession', 'coordination', 'positional advantages', 'refutations'). Keep it simple, clear, and direct. Do not write full sentences in the bullets. Just the bullets, the separator, and the simple summary.`,
+                      Use extremely simple, easy-to-understand words. Absolutely AVOID advanced chess jargon (e.g. 'tempo', 'tension', 'counterplay', 'structural concession', 'coordination', 'positional advantages', 'refutations'). Do not write list items or bullet points. Just the paragraph, the separator, and the simple summary.`,
                     },
                   ],
                 },
@@ -668,7 +675,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   saveGameToHistory: () => {
-    const { moveHistory, result, timeControl, playerColor } = get();
+    const { moveHistory, result, timeControl, playerColor, gameMode } = get();
     if (moveHistory.length === 0) return;
 
     // Calculate accuracies dynamically to preserve in history
@@ -700,6 +707,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       result: result || "½-½ Draw",
       timeControl: timeControl.label,
       playerColor,
+      gameMode, // Added gameMode
       whiteAccuracy: wAcc,
       blackAccuracy: bAcc,
       moves: moveHistory.map(m => ({
@@ -728,5 +736,104 @@ export const useGameStore = create<GameState>((set, get) => ({
       localStorage.removeItem("chessmind_game_history");
     }
     set({ gameHistory: [], selectedHistoryGame: null });
+  },
+
+  saveCurrentGame: () => {
+    const {
+      fen,
+      moveHistory,
+      gameMode,
+      playerColor,
+      aiLevel,
+      timeControl,
+      whiteTime,
+      blackTime,
+      activeColor,
+      boardFlipped,
+      lastMove,
+      isGameOver,
+      result,
+    } = get();
+
+    if (typeof window !== "undefined") {
+      const saveData = {
+        fen,
+        moveHistory: moveHistory.map(m => ({
+          move: m.move,
+          classification: m.classification,
+          eval: m.eval,
+          fen: m.fen,
+          coachExplanation: m.coachExplanation || null,
+          coachSummary: m.coachSummary || null,
+        })),
+        gameMode,
+        playerColor,
+        aiLevel,
+        timeControl,
+        whiteTime,
+        blackTime,
+        activeColor,
+        clockRunning: false, // Don't run clock immediately on resume until unpaused
+        boardFlipped,
+        lastMove,
+        isGameOver,
+        result,
+      };
+      localStorage.setItem("chessmind_saved_game", JSON.stringify(saveData));
+      set({ hasSavedGame: true });
+    }
+  },
+
+  resumeSavedGame: () => {
+    if (typeof window !== "undefined") {
+      const savedStr = localStorage.getItem("chessmind_saved_game");
+      if (!savedStr) return false;
+      try {
+        const saved = JSON.parse(savedStr);
+        const game = new Chess(saved.fen);
+        set({
+          game,
+          fen: saved.fen,
+          moveHistory: saved.moveHistory,
+          isGameOver: saved.isGameOver,
+          result: saved.result,
+          gameMode: saved.gameMode,
+          playerColor: saved.playerColor,
+          aiLevel: saved.aiLevel,
+          timeControl: saved.timeControl,
+          whiteTime: saved.whiteTime,
+          blackTime: saved.blackTime,
+          activeColor: saved.activeColor,
+          clockRunning: saved.clockRunning,
+          boardFlipped: saved.boardFlipped,
+          lastMove: saved.lastMove,
+          showSetup: false,
+          isThinking: false,
+          selectedSquare: null,
+          legalMoves: [],
+          activeExplanationMoveIndex: null,
+          coachExplanation: null,
+        });
+        return true;
+      } catch (err) {
+        console.error("Failed to parse saved game:", err);
+        return false;
+      }
+    }
+    return false;
+  },
+
+  deleteSavedGame: () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("chessmind_saved_game");
+      set({ hasSavedGame: false });
+    }
+  },
+
+  checkSavedGame: () => {
+    if (typeof window !== "undefined") {
+      const exists = !!localStorage.getItem("chessmind_saved_game");
+      set({ hasSavedGame: exists });
+    }
   },
 }));

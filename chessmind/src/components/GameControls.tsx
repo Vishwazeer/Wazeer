@@ -9,6 +9,8 @@ export default function GameControls() {
   const resign = useGameStore((s) => s.resign);
   const resetGame = useGameStore((s) => s.resetGame);
   const moveHistory = useGameStore((s) => s.moveHistory);
+  const gameMode = useGameStore((s) => s.gameMode);
+  const saveCurrentGame = useGameStore((s) => s.saveCurrentGame);
 
   return (
     <div className="flex flex-col gap-3">
@@ -71,6 +73,22 @@ export default function GameControls() {
           </button>
         )}
       </div>
+
+      {!isGameOver && gameMode !== "online" && (
+        <button
+          onClick={() => {
+            saveCurrentGame();
+            alert("Game state saved successfully!");
+          }}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 
+                     bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/30 
+                     rounded-xl text-sm font-bold text-[var(--color-accent-light)]
+                     hover:bg-[var(--color-accent)]/25 hover:border-[var(--color-accent)]/40
+                     active:scale-[0.98] transition-all shadow-md"
+        >
+          💾 Save Game State
+        </button>
+      )}
     </div>
   );
 }

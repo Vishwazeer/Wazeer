@@ -115,8 +115,9 @@ export default function Board() {
           // Add it to the store
           useGameStore.getState().addClassification(currentHistoryLength - 1, classification, evalFromWhite);
 
-          // Trigger AI Coach explanation ONLY for the human player's moves
-          if (justMoved === playerColor) {
+          // Trigger AI Coach explanation (all sides in local mode, or only human player in other modes)
+          const isCoachAllowed = state.gameMode === "local" || justMoved === state.playerColor;
+          if (isCoachAllowed) {
             if (classification === "mistake" || classification === "blunder") {
               const moveSan = state.moveHistory[currentHistoryLength - 1]?.move?.san || "";
               useGameStore.getState().generateCoachExplanation(state.fen, moveSan, classification, evalFromWhite).catch(console.error);

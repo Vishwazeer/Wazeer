@@ -25,12 +25,13 @@ function MoveEntry({
   const setActiveExplanationMoveIndex = useGameStore((s) => s.setActiveExplanationMoveIndex);
   const moveHistoryLength = useGameStore((s) => s.moveHistory.length);
   const playerColor = useGameStore((s) => s.playerColor);
+  const gameMode = useGameStore((s) => s.gameMode);
 
   const isWhite = index % 2 === 0;
   const moveColor = isWhite ? "w" : "b";
-  const isHumanMove = moveColor === playerColor;
+  const isInteractive = gameMode === "local" || moveColor === playerColor;
 
-  if (!isHumanMove) {
+  if (!isInteractive) {
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs text-[var(--color-text-dim)]/60">
         <span>{move.san}</span>
@@ -40,7 +41,10 @@ function MoveEntry({
 
   // Find the latest move played by the human player to check if activeExplanationMoveIndex is defaulting to it
   const getLatestHumanMoveIndex = () => {
-    const { moveHistory } = useGameStore.getState();
+    const { moveHistory, gameMode } = useGameStore.getState();
+    if (gameMode === "local") {
+      return moveHistory.length - 1;
+    }
     for (let i = moveHistory.length - 1; i >= 0; i--) {
       const isW = i % 2 === 0;
       const mCol = isW ? "w" : "b";

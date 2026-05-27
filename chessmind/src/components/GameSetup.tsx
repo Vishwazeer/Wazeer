@@ -21,6 +21,11 @@ export default function GameSetup() {
   const onlineOpponentJoined = useGameStore((s) => s.onlineOpponentJoined);
   const syncOnlineState = useGameStore((s) => s.syncOnlineState);
 
+  const hasSavedGame = useGameStore((s) => s.hasSavedGame);
+  const checkSavedGame = useGameStore((s) => s.checkSavedGame);
+  const resumeSavedGame = useGameStore((s) => s.resumeSavedGame);
+  const deleteSavedGame = useGameStore((s) => s.deleteSavedGame);
+
   const [modeTab, setModeTab] = useState<"ai" | "local" | "online">("ai");
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [lobbyCode, setLobbyCode] = useState<string | null>(null);
@@ -53,6 +58,11 @@ export default function GameSetup() {
 
     return () => clearInterval(interval);
   }, [onlineRoomCode, onlineOpponentJoined, modeTab, lobbyCode, syncOnlineState]);
+
+  // Check for saved game on mount
+  useEffect(() => {
+    checkSavedGame();
+  }, [checkSavedGame]);
 
   const handleStartLocalOrAI = () => {
     if (modeTab === "ai") {
@@ -125,6 +135,44 @@ export default function GameSetup() {
               </p>
             </div>
           </div>
+
+          {/* Resume Saved Game option */}
+          {hasSavedGame && (
+            <div className="px-6 pt-4">
+              <div className="bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/30 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div className="text-left w-full sm:w-auto">
+                  <span className="text-xs font-black text-white block">
+                    💾 Saved Game Found!
+                  </span>
+                  <span className="text-[9px] text-[var(--color-text-dim)] uppercase tracking-wider font-semibold">
+                    You have an ongoing match saved in this browser.
+                  </span>
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto justify-end shrink-0">
+                  <button
+                    onClick={() => {
+                      if (resumeSavedGame()) {
+                        // Success!
+                      }
+                    }}
+                    className="flex-1 sm:flex-initial py-2.5 px-4 rounded-lg text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-cyan)] text-white hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md shadow-[var(--color-accent)]/25"
+                  >
+                    📂 Resume
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm("Are you sure you want to discard your saved game?")) {
+                        deleteSavedGame();
+                      }
+                    }}
+                    className="py-2.5 px-3 rounded-lg text-[10px] font-bold uppercase border border-[var(--color-red)]/35 text-[var(--color-red)] hover:bg-[var(--color-red)]/10 transition-all"
+                  >
+                    🗑️ Discard
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Mode Tabs */}
           <div className="px-6 pt-4 flex bg-white/5 border-b border-[var(--color-border)] p-1">
