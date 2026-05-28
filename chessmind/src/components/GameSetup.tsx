@@ -128,7 +128,7 @@ export default function GameSetup() {
           <div className="p-6 pb-4 border-b border-[var(--color-border)] flex justify-between items-center bg-[var(--color-surface-2)]">
             <div>
               <h2 className="text-xl font-black tracking-tight text-white uppercase">
-                ♟ ChessMind Lobby
+                ♟ Wazeer Lobby
               </h2>
               <p className="text-[10px] text-[var(--color-text-dim)] uppercase tracking-wider font-semibold mt-0.5">
                 Configure your game settings

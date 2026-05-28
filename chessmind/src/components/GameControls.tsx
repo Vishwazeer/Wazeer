@@ -1,6 +1,7 @@
 "use client";
 
 import { useGameStore } from "@/store/gameStore";
+import { useAuthStore } from "@/store/authStore";
 
 export default function GameControls() {
   const isGameOver = useGameStore((s) => s.isGameOver);
@@ -18,9 +19,28 @@ export default function GameControls() {
   const playerColor = useGameStore((s) => s.playerColor);
   const onlinePlayerColor = useGameStore((s) => s.onlinePlayerColor);
 
+  // Auth
+  const user = useAuthStore((s) => s.user);
+  const openAuthModal = useAuthStore((s) => s.openAuthModal);
+
   const turn = game.turn();
   const myColor = gameMode === "online" ? onlinePlayerColor : playerColor;
   const isMyTurn = gameMode === "local" || turn === myColor;
+
+  const handleSaveGame = () => {
+    if (!user) {
+      // Not logged in — prompt sign in
+      openAuthModal();
+      return;
+    }
+    saveCurrentGame();
+    // Brief success feedback
+    const btn = document.getElementById("save-game-btn");
+    if (btn) {
+      btn.textContent = "✅ Saved!";
+      setTimeout(() => { btn.textContent = "💾 Save Game State"; }, 2000);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -100,17 +120,15 @@ export default function GameControls() {
 
       {!isGameOver && gameMode !== "online" && (
         <button
-          onClick={() => {
-            saveCurrentGame();
-            alert("Game state saved successfully!");
-          }}
+          id="save-game-btn"
+          onClick={handleSaveGame}
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 
                      bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/30 
                      rounded-xl text-sm font-bold text-[var(--color-accent-light)]
                      hover:bg-[var(--color-accent)]/25 hover:border-[var(--color-accent)]/40
                      active:scale-[0.98] transition-all shadow-md"
         >
-          💾 Save Game State
+          {user ? "💾 Save Game State" : "🔒 Save Game (Sign In)"}
         </button>
       )}
     </div>

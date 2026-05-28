@@ -29,6 +29,18 @@ export default function Board() {
   const onlinePlayerColor = useGameStore((s) => s.onlinePlayerColor);
   const activeHint = useGameStore((s) => s.activeHint);
 
+  // Review mode
+  const isReviewingHistory = useGameStore((s) => s.isReviewingHistory);
+  const reviewFen = useGameStore((s) => s.reviewFen);
+  const reviewMoveIndex = useGameStore((s) => s.reviewMoveIndex);
+  const reviewMoves = useGameStore((s) => s.reviewMoves);
+  const reviewForward = useGameStore((s) => s.reviewForward);
+  const reviewBackward = useGameStore((s) => s.reviewBackward);
+  const exitReviewMode = useGameStore((s) => s.exitReviewMode);
+
+  // The FEN to render — live game or review position
+  const displayFen = isReviewingHistory && reviewFen ? reviewFen : fen;
+
   const playEngineRef = useRef<ReturnType<typeof getPlayEngine> | null>(null);
   const analysisEngineRef = useRef<ReturnType<typeof getAnalysisEngine> | null>(null);
   const prevEvalRef = useRef<number>(0);
@@ -164,13 +176,15 @@ export default function Board() {
   }, [fen, gameMode, onlineRoomCode, isGameOver]);
 
   // Parse FEN to get board state
-  const board = parseFen(fen);
+  const board = parseFen(displayFen);
 
   // Determine display order based on flip
   const displayRanks = boardFlipped ? [...RANKS].reverse() : RANKS;
   const displayFiles = boardFlipped ? [...FILES].reverse() : FILES;
 
   function handleSquareClick(square: Square) {
+    // Block all moves during replay
+    if (isReviewingHistory) return;
     const state = useGameStore.getState();
     if (state.isGameOver) return;
     if (state.gameMode === "ai" && state.game.turn() !== state.playerColor) return;
@@ -263,6 +277,67 @@ export default function Board() {
           })
         )}
       </div>
+
+      {/* Review Mode Overlay Banner */}
+      {isReviewingHistory && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: "8px 12px",
+            background: "rgba(124, 92, 252, 0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            zIndex: 10,
+            borderBottomLeftRadius: 12,
+            borderBottomRightRadius: 12,
+          }}
+        >
+          <span style={{ fontSize: 11, fontWeight: 700, color: "white", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            📽 Replay Mode — Move {reviewMoveIndex !== null && reviewMoveIndex >= 0 ? reviewMoveIndex + 1 : 0} / {reviewMoves.length}
+          </span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={reviewBackward}
+              disabled={(reviewMoveIndex ?? -1) <= -1}
+              style={{
+                width: 28, height: 28, borderRadius: 6,
+                background: "rgba(255,255,255,0.15)",
+                border: "1px solid rgba(255,255,255,0.3)",
+                color: "white", fontSize: 14, fontWeight: 700,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: (reviewMoveIndex ?? -1) <= -1 ? 0.4 : 1,
+              }}
+            >◀</button>
+            <button
+              onClick={reviewForward}
+              disabled={(reviewMoveIndex ?? -1) >= reviewMoves.length - 1}
+              style={{
+                width: 28, height: 28, borderRadius: 6,
+                background: "rgba(255,255,255,0.15)",
+                border: "1px solid rgba(255,255,255,0.3)",
+                color: "white", fontSize: 14, fontWeight: 700,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: (reviewMoveIndex ?? -1) >= reviewMoves.length - 1 ? 0.4 : 1,
+              }}
+            >▶</button>
+            <button
+              onClick={exitReviewMode}
+              style={{
+                height: 28, padding: "0 10px", borderRadius: 6,
+                background: "rgba(255,255,255,0.15)",
+                border: "1px solid rgba(255,255,255,0.3)",
+                color: "white", fontSize: 10, fontWeight: 700,
+                cursor: "pointer", letterSpacing: "0.05em", textTransform: "uppercase",
+              }}
+            >✕ Exit</button>
+          </div>
+        </div>
+      )}
 
       {/* Thinking indicator */}
       {isThinking && (

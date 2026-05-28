@@ -135,6 +135,17 @@ interface GameState {
   activeHint: { from: Square; to: Square } | null;
   requestHint: () => Promise<void>;
   clearHint: () => void;
+
+  // Board Replay (History Review Mode)
+  isReviewingHistory: boolean;
+  reviewFen: string | null;
+  reviewMoveIndex: number | null; // -1 = start position, 0..n = after move n
+  reviewMoves: Array<{ san: string; fen: string; classification: string | null; eval?: number; coachExplanation?: string | null; coachSummary?: string | null }>;
+  enterReviewMode: (game: any) => void;
+  exitReviewMode: () => void;
+  reviewGoTo: (index: number) => void;
+  reviewForward: () => void;
+  reviewBackward: () => void;
 }
 
 
@@ -181,6 +192,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   hasSavedGame: false,
   hintsRemaining: 3,
   activeHint: null,
+
+  // Board Replay state
+  isReviewingHistory: false,
+  reviewFen: null,
+  reviewMoveIndex: null,
+  reviewMoves: [],
 
   makeMove: (from, to, promotion) => {
     const { game, timeControl, moveHistory } = get();
@@ -414,9 +431,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   setGeminiApiKey: (key) => {
     if (typeof window !== "undefined") {
       if (key) {
-        localStorage.setItem("chessmind_gemini_key", key);
+        localStorage.setItem("wazeer_gemini_key", key);
       } else {
-        localStorage.removeItem("chessmind_gemini_key");
+        localStorage.removeItem("wazeer_gemini_key");
       }
     }
     set({ geminiApiKey: key });
@@ -699,7 +716,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   loadGameHistory: () => {
     if (typeof window !== "undefined") {
-      const existing = localStorage.getItem("chessmind_game_history");
+      const existing = localStorage.getItem("wazeer_game_history");
       const history = existing ? JSON.parse(existing) : [];
       set({ gameHistory: history });
     }
@@ -752,10 +769,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     };
 
     if (typeof window !== "undefined") {
-      const existing = localStorage.getItem("chessmind_game_history");
+      const existing = localStorage.getItem("wazeer_game_history");
       const history = existing ? JSON.parse(existing) : [];
       const updated = [newGameRecord, ...history].slice(0, 10);
-      localStorage.setItem("chessmind_game_history", JSON.stringify(updated));
+      localStorage.setItem("wazeer_game_history", JSON.stringify(updated));
       set({ gameHistory: updated });
     }
   },
@@ -764,7 +781,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   clearGameHistory: () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("chessmind_game_history");
+      localStorage.removeItem("wazeer_game_history");
     }
     set({ gameHistory: [], selectedHistoryGame: null });
   },
@@ -810,14 +827,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         isGameOver,
         result,
       };
-      localStorage.setItem("chessmind_saved_game", JSON.stringify(saveData));
+      localStorage.setItem("wazeer_saved_game", JSON.stringify(saveData));
       set({ hasSavedGame: true });
     }
   },
 
   resumeSavedGame: () => {
     if (typeof window !== "undefined") {
-      const savedStr = localStorage.getItem("chessmind_saved_game");
+      const savedStr = localStorage.getItem("wazeer_saved_game");
       if (!savedStr) return false;
       try {
         const saved = JSON.parse(savedStr);
@@ -856,14 +873,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   deleteSavedGame: () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("chessmind_saved_game");
+      localStorage.removeItem("wazeer_saved_game");
       set({ hasSavedGame: false });
     }
   },
 
   checkSavedGame: () => {
     if (typeof window !== "undefined") {
-      const exists = !!localStorage.getItem("chessmind_saved_game");
+      const exists = !!localStorage.getItem("wazeer_saved_game");
       set({ hasSavedGame: exists });
     }
   },
@@ -902,4 +919,52 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   clearHint: () => set({ activeHint: null }),
+
+  // ── Board Replay (History Review Mode) ──────────────────────────────────────
+  enterReviewMode: (game: any) => {
+    const moves = game.moves || [];
+    // Start at the final position
+    const lastIndex = moves.length - 1;
+    const startFen = lastIndex >= 0 ? moves[lastIndex].fen : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    set({
+      isReviewingHistory: true,
+      reviewMoves: moves,
+      reviewMoveIndex: lastIndex,
+      reviewFen: startFen,
+    });
+  },
+
+  exitReviewMode: () => {
+    set({
+      isReviewingHistory: false,
+      reviewFen: null,
+      reviewMoveIndex: null,
+      reviewMoves: [],
+    });
+  },
+
+  reviewGoTo: (index: number) => {
+    const { reviewMoves } = get();
+    if (index < -1 || index >= reviewMoves.length) return;
+    const INITIAL_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const fen = index === -1 ? INITIAL_FEN : reviewMoves[index].fen;
+    set({ reviewMoveIndex: index, reviewFen: fen });
+  },
+
+  reviewForward: () => {
+    const { reviewMoveIndex, reviewMoves } = get();
+    const next = (reviewMoveIndex ?? -1) + 1;
+    if (next >= reviewMoves.length) return;
+    const fen = reviewMoves[next].fen;
+    set({ reviewMoveIndex: next, reviewFen: fen });
+  },
+
+  reviewBackward: () => {
+    const { reviewMoveIndex, reviewMoves } = get();
+    const current = reviewMoveIndex ?? 0;
+    const prev = current - 1;
+    const INITIAL_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const fen = prev < 0 ? INITIAL_FEN : reviewMoves[prev].fen;
+    set({ reviewMoveIndex: prev < 0 ? -1 : prev, reviewFen: fen });
+  },
 }));

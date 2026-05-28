@@ -42,7 +42,7 @@ export default function AICoach() {
   // Safely fetch key in useEffect to avoid hydration mismatches
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const storedKey = localStorage.getItem("chessmind_gemini_key");
+      const storedKey = localStorage.getItem("wazeer_gemini_key");
       if (storedKey) {
         setGeminiApiKey(storedKey);
         setApiKeyInput(storedKey);

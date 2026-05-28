@@ -11,7 +11,9 @@ import GameControls from "@/components/GameControls";
 import AICoach from "@/components/AICoach";
 import PostGameReport from "@/components/PostGameReport";
 import GameHistory from "@/components/GameHistory";
+import AuthModal from "@/components/AuthModal";
 import { useGameStore } from "@/store/gameStore";
+import { useAuthStore } from "@/store/authStore";
 
 // Dynamic imports to avoid SSR issues with chess board and Stockfish
 const Board = dynamic(() => import("@/components/Board"), {
@@ -25,17 +27,25 @@ export default function PlayPage() {
   const isGameOver = useGameStore((s) => s.isGameOver);
   const [rightTab, setRightTab] = useState<"game" | "history">("game");
 
+  const user = useAuthStore((s) => s.user);
+  const authLoading = useAuthStore((s) => s.authLoading);
+  const openAuthModal = useAuthStore((s) => s.openAuthModal);
+  const signOut = useAuthStore((s) => s.signOut);
+
   return (
     <div className="min-h-screen bg-[var(--color-bg)]">
       {/* Game Setup Modal */}
       <GameSetup />
+
+      {/* Auth Modal */}
+      <AuthModal />
 
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl font-extrabold tracking-tight">
             <span className="bg-gradient-to-r from-[var(--color-accent)] via-[var(--color-cyan)] to-[var(--color-pink)] bg-clip-text text-transparent">
-              ChessMind
+              Wazeer
             </span>
           </span>
         </Link>
@@ -43,6 +53,41 @@ export default function PlayPage() {
           <span className="text-xs text-[var(--color-text-dim)] font-mono">
             AI Powered
           </span>
+
+          {/* Auth status */}
+          {!authLoading && (
+            user ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="avatar" className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-[var(--color-accent)]/30 flex items-center justify-center text-[9px] font-bold text-[var(--color-accent-light)]">
+                      {(user.displayName || user.email || "U")[0].toUpperCase()}
+                    </span>
+                  )}
+                  <span className="text-[10px] font-semibold text-[var(--color-text-muted)] max-w-[80px] truncate">
+                    {user.displayName || user.email?.split("@")[0] || "User"}
+                  </span>
+                </div>
+                <button
+                  onClick={signOut}
+                  className="text-[10px] font-bold text-[var(--color-text-dim)] hover:text-[var(--color-red)] transition-colors px-2 py-1 rounded-lg hover:bg-[var(--color-red)]/10"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={openAuthModal}
+                className="px-4 py-1.5 text-xs font-bold rounded-xl
+                           bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/30
+                           text-[var(--color-accent-light)] hover:bg-[var(--color-accent)]/25 transition-all"
+              >
+                Sign In
+              </button>
+            )
+          )}
         </div>
       </header>
 

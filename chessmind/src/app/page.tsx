@@ -76,7 +76,7 @@ export default function HomePage() {
           className="text-[clamp(3rem,7vw,5.5rem)] font-black tracking-[-3px] leading-[1.05] mb-6"
         >
           <span className="bg-gradient-to-r from-[var(--color-accent)] via-[var(--color-cyan)] to-[var(--color-pink)] bg-clip-text text-transparent">
-            ChessMind
+            Wazeer
           </span>
           <br />
           <span className="text-[var(--color-text)]">AI-Powered Chess</span>
@@ -203,7 +203,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="text-center py-12 border-t border-[var(--color-border)]">
-        <p className="text-lg font-extrabold tracking-[-0.5px] mb-1">ChessMind</p>
+        <p className="text-lg font-extrabold tracking-[-0.5px] mb-1">Wazeer</p>
         <p className="text-xs text-[var(--color-text-dim)]">
           AI-Powered Chess · Built for Antigravity · 2026
         </p>

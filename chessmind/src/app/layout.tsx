@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AuthProvider from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "ChessMind — AI-Powered Chess",
+  title: "Wazeer — AI-Powered Chess",
   description:
-    "Play chess against AI or friends. Every move analyzed, rated, and explained in real-time by AI.",
-  keywords: ["chess", "AI", "stockfish", "analysis", "online chess"],
+    "Play chess against AI or friends on Wazeer. Every move analyzed, rated, and explained in real-time by AI.",
+  keywords: ["chess", "AI", "stockfish", "analysis", "online chess", "wazeer"],
 };
 
 export default function RootLayout({
@@ -21,7 +22,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
